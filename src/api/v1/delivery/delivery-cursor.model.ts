@@ -6,8 +6,8 @@ export class DeliveryCursorModel {
   @PrimaryColumn('uuid', { name: 'session_uuid' })
   sessionUuid!: string;
 
-  @PrimaryColumn({ name: 'audience_room', type: 'varchar', length: 80 })
-  audienceRoom!: string;
+  @PrimaryColumn({ type: 'varchar', length: 80 })
+  channel!: string;
 
   @Column({ name: 'user_uuid', type: 'uuid' })
   userUuid!: string;

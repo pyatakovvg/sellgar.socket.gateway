@@ -1,18 +1,14 @@
-import { audienceRoom, DeliveryAudienceDto } from './controller/dto/delivery-request.dto';
+import { DeliveryChannel, DELIVERY_CHANNELS } from './delivery.constants';
 
 export interface DeliveryMessage {
+  channel: DeliveryChannel;
   deliveryId: string;
   sequence: string;
   eventType: string;
   schemaVersion: number;
   occurredAt: string;
   expiresAt: string;
-  audience: DeliveryAudienceDto;
   payload: Record<string, unknown>;
-}
-
-export function deliveryRoom(message: DeliveryMessage): string {
-  return audienceRoom(message.audience);
 }
 
 export function parseDeliveryMessage(value: unknown): DeliveryMessage {
@@ -21,8 +17,8 @@ export function parseDeliveryMessage(value: unknown): DeliveryMessage {
   }
 
   const message = value as Partial<DeliveryMessage>;
-  const audience = message.audience as Partial<DeliveryAudienceDto> | undefined;
   if (
+    !DELIVERY_CHANNELS.includes(message.channel as DeliveryChannel) ||
     typeof message.deliveryId !== 'string' ||
     typeof message.sequence !== 'string' ||
     !/^\d+$/.test(message.sequence) ||
@@ -30,9 +26,6 @@ export function parseDeliveryMessage(value: unknown): DeliveryMessage {
     typeof message.schemaVersion !== 'number' ||
     typeof message.occurredAt !== 'string' ||
     typeof message.expiresAt !== 'string' ||
-    !audience ||
-    typeof audience.type !== 'string' ||
-    (audience.type !== 'broadcast' && typeof audience.uuid !== 'string') ||
     !message.payload ||
     typeof message.payload !== 'object'
   ) {

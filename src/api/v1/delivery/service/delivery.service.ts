@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 
 import { DeliveryRequestDto } from '../controller/dto/delivery-request.dto';
 import { DeliveryMessage } from '../delivery.entity';
+import { DeliveryChannel } from '../delivery.constants';
 import { DeliveryRepository } from '../repository/delivery.repository';
 
 @Injectable()
@@ -26,21 +27,21 @@ export class DeliveryService {
     return this.repository.accept(event, expiresAt);
   }
 
-  cursors(sessionUuid: string, userUuid: string, rooms: string[]): Promise<Record<string, string>> {
-    return this.repository.getOrCreateCursors(sessionUuid, userUuid, rooms);
+  cursor(sessionUuid: string, userUuid: string, channel: DeliveryChannel): Promise<string> {
+    return this.repository.getOrCreateCursor(sessionUuid, userUuid, channel);
   }
 
-  acknowledge(sessionUuid: string, userUuid: string, room: string, sequence: string): Promise<unknown> {
-    return this.repository.acknowledge(sessionUuid, userUuid, room, sequence);
+  acknowledge(sessionUuid: string, userUuid: string, channel: DeliveryChannel, sequence: string): Promise<unknown> {
+    return this.repository.acknowledge(sessionUuid, userUuid, channel, sequence);
   }
 
-  highWatermarks(rooms: string[]): Promise<Record<string, string>> {
-    return this.repository.highWatermarks(rooms);
+  highWatermark(channel: DeliveryChannel): Promise<string> {
+    return this.repository.highWatermark(channel);
   }
 
-  replay(rooms: string[], after: string, upTo: string): Promise<DeliveryMessage[]> {
+  replay(channel: DeliveryChannel, after: string, upTo: string): Promise<DeliveryMessage[]> {
     return this.repository.replay(
-      rooms,
+      channel,
       after,
       upTo,
       this.config.getOrThrow<number>('DELIVERY_REPLAY_BATCH_SIZE'),

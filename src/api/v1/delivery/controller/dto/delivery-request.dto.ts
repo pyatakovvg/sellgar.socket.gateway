@@ -1,30 +1,6 @@
-import { Type } from 'class-transformer';
-import {
-  IsIn,
-  IsInt,
-  IsISO8601,
-  IsObject,
-  IsOptional,
-  IsString,
-  IsUUID,
-  Min,
-  ValidateIf,
-  ValidateNested,
-} from 'class-validator';
+import { IsIn, IsInt, IsISO8601, IsObject, IsOptional, IsString, IsUUID, Min } from 'class-validator';
 
-import { BROADCAST_ROOM } from '../../delivery.constants';
-
-export const DELIVERY_AUDIENCE_TYPES = ['broadcast', 'user', 'tenant', 'shop', 'job'] as const;
-export type DeliveryAudienceType = (typeof DELIVERY_AUDIENCE_TYPES)[number];
-
-export class DeliveryAudienceDto {
-  @IsIn(DELIVERY_AUDIENCE_TYPES)
-  type!: DeliveryAudienceType;
-
-  @ValidateIf((audience: DeliveryAudienceDto) => audience.type !== 'broadcast')
-  @IsUUID()
-  uuid?: string;
-}
+import { DELIVERY_CHANNELS, DeliveryChannel } from '../../delivery.constants';
 
 export class DeliveryRequestDto {
   @IsUUID()
@@ -40,9 +16,8 @@ export class DeliveryRequestDto {
   @IsISO8601()
   occurredAt!: string;
 
-  @ValidateNested()
-  @Type(() => DeliveryAudienceDto)
-  audience!: DeliveryAudienceDto;
+  @IsIn(DELIVERY_CHANNELS)
+  channel!: DeliveryChannel;
 
   @IsObject()
   payload!: Record<string, unknown>;
@@ -50,8 +25,4 @@ export class DeliveryRequestDto {
   @IsOptional()
   @IsISO8601()
   expiresAt?: string;
-}
-
-export function audienceRoom(audience: DeliveryAudienceDto): string {
-  return audience.type === 'broadcast' ? BROADCAST_ROOM : `${audience.type}:${audience.uuid}`;
 }

@@ -2,8 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 
+import { DeliveryRequestDto } from '../controller/dto/delivery-request.dto';
 import { DeliveryMessage } from '../delivery.entity';
-import { audienceRoom, DeliveryRequestDto } from '../controller/dto/delivery-request.dto';
+import { DeliveryChannel } from '../delivery.constants';
 
 type QueryRow = Record<string, unknown>;
 
@@ -34,12 +35,10 @@ export class DeliveryRepository {
               schema_version,
               occurred_at,
               expires_at,
-              audience_type,
-              audience_uuid,
-              audience_room,
+              channel,
               payload
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
+            VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
             ON CONFLICT (event_uuid) DO NOTHING
             RETURNING event_uuid
           `,
@@ -49,9 +48,7 @@ export class DeliveryRepository {
             request.schemaVersion,
             request.occurredAt,
             expiresAt,
-            request.audience.type,
-            request.audience.uuid ?? null,
-            audienceRoom(request.audience),
+            request.channel,
             JSON.stringify(request.payload),
           ],
         ),
@@ -109,7 +106,7 @@ export class DeliveryRepository {
                     ON earlier_event.event_uuid = earlier_outbox.event_uuid
                   JOIN delivery_event AS current_event
                     ON current_event.event_uuid = delivery_outbox.event_uuid
-                  WHERE earlier_event.audience_room = current_event.audience_room
+                  WHERE earlier_event.channel = current_event.channel
                     AND earlier_event.sequence < current_event.sequence
                     AND earlier_outbox.status <> 'published'
                 )
@@ -132,8 +129,7 @@ export class DeliveryRepository {
               event.schema_version,
               event.occurred_at,
               event.expires_at,
-              event.audience_type,
-              event.audience_uuid,
+              event.channel,
               event.payload,
               outbox.attempts
           `,
@@ -183,39 +179,38 @@ export class DeliveryRepository {
     );
   }
 
-  async getOrCreateCursors(sessionUuid: string, userUuid: string, rooms: string[]): Promise<Record<string, string>> {
+  async getOrCreateCursor(sessionUuid: string, userUuid: string, channel: DeliveryChannel): Promise<string> {
     return this.dataSource.transaction(async (manager) => {
       await manager.query(
         `
-          INSERT INTO delivery_cursor (session_uuid, audience_room, user_uuid)
-          SELECT $1::uuid, rooms.room, $2::uuid
-          FROM UNNEST($3::varchar[]) AS rooms(room)
-          ON CONFLICT (session_uuid, audience_room) DO NOTHING
+          INSERT INTO delivery_cursor (session_uuid, channel, user_uuid)
+          VALUES ($1::uuid, $3, $2::uuid)
+          ON CONFLICT (session_uuid, channel) DO NOTHING
         `,
-        [sessionUuid, userUuid, rooms],
+        [sessionUuid, userUuid, channel],
       );
 
-      const rows = this.rows(
+      const [row] = this.rows(
         await manager.query(
           `
-            SELECT audience_room, user_uuid, sequence
+            SELECT user_uuid, sequence
             FROM delivery_cursor
             WHERE session_uuid = $1
-              AND audience_room = ANY($2::varchar[])
+              AND channel = $2
             FOR UPDATE
           `,
-          [sessionUuid, rooms],
+          [sessionUuid, channel],
         ),
       );
-      if (rows.some((row) => String(row.user_uuid) !== userUuid)) {
+      if (!row || String(row.user_uuid) !== userUuid) {
         throw new Error('Socket session belongs to another user');
       }
 
-      return Object.fromEntries(rows.map((row) => [String(row.audience_room), String(row.sequence)]));
+      return String(row.sequence);
     });
   }
 
-  acknowledge(sessionUuid: string, userUuid: string, room: string, sequence: string): Promise<unknown> {
+  acknowledge(sessionUuid: string, userUuid: string, channel: DeliveryChannel, sequence: string): Promise<unknown> {
     return this.dataSource.manager.query(
       `
         UPDATE delivery_cursor
@@ -224,32 +219,23 @@ export class DeliveryRepository {
           acknowledged_at = NOW()
         WHERE session_uuid = $1
           AND user_uuid = $2
-          AND audience_room = $3
+          AND channel = $3
       `,
-      [sessionUuid, userUuid, room, sequence],
+      [sessionUuid, userUuid, channel, sequence],
     );
   }
 
-  async highWatermarks(rooms: string[]): Promise<Record<string, string>> {
-    const rows = this.rows(
+  async highWatermark(channel: DeliveryChannel): Promise<string> {
+    const [row] = this.rows(
       await this.dataSource.manager.query(
-        `
-          SELECT rooms.room, COALESCE(MAX(event.sequence), 0) AS sequence
-          FROM UNNEST($1::varchar[]) AS rooms(room)
-          LEFT JOIN delivery_event AS event ON event.audience_room = rooms.room
-          GROUP BY rooms.room
-        `,
-        [rooms],
+        'SELECT COALESCE(MAX(sequence), 0) AS sequence FROM delivery_event WHERE channel = $1',
+        [channel],
       ),
     );
-    return Object.fromEntries(rows.map((row) => [String(row.room), String(row.sequence)]));
+    return String(row?.sequence ?? '0');
   }
 
-  async replay(rooms: string[], after: string, upTo: string, limit: number): Promise<DeliveryMessage[]> {
-    if (rooms.length === 0) {
-      return [];
-    }
-
+  async replay(channel: DeliveryChannel, after: string, upTo: string, limit: number): Promise<DeliveryMessage[]> {
     const rows = this.rows(
       await this.dataSource.manager.query(
         `
@@ -260,18 +246,17 @@ export class DeliveryRepository {
             schema_version,
             occurred_at,
             expires_at,
-            audience_type,
-            audience_uuid,
+            channel,
             payload
           FROM delivery_event
-          WHERE audience_room = ANY($1::varchar[])
+          WHERE channel = $1
             AND sequence > $2::bigint
             AND sequence <= $3::bigint
             AND expires_at > NOW()
           ORDER BY sequence ASC
           LIMIT $4
         `,
-        [rooms, after, upTo, limit],
+        [channel, after, upTo, limit],
       ),
     );
 
@@ -323,19 +308,13 @@ export class DeliveryRepository {
 
   private message(row: QueryRow): DeliveryMessage {
     return {
+      channel: String(row.channel) as DeliveryChannel,
       deliveryId: String(row.event_uuid),
       sequence: String(row.sequence),
       eventType: String(row.event_type),
       schemaVersion: Number(row.schema_version),
       occurredAt: new Date(String(row.occurred_at)).toISOString(),
       expiresAt: new Date(String(row.expires_at)).toISOString(),
-      audience:
-        row.audience_type === 'broadcast'
-          ? { type: 'broadcast' }
-          : {
-              type: String(row.audience_type) as DeliveryMessage['audience']['type'],
-              uuid: String(row.audience_uuid),
-            },
       payload: row.payload as Record<string, unknown>,
     };
   }

@@ -13,7 +13,7 @@ describe(DeliveryRepository.name, () => {
     await expect(
       repository.accept(
         {
-          audience: { type: 'user', uuid: '3a4752e0-c56d-4d72-8976-28438f680fb8' },
+          channel: 'products',
           eventType: 'product.import.progressed.v1',
           eventUuid: '5a943eb6-4d4f-4c11-9962-08cf45e1697e',
           occurredAt: '2026-08-08T12:00:00.000Z',
@@ -39,7 +39,7 @@ describe(DeliveryRepository.name, () => {
     await expect(
       repository.accept(
         {
-          audience: { type: 'user', uuid: '3a4752e0-c56d-4d72-8976-28438f680fb8' },
+          channel: 'products',
           eventType: 'product.import.progressed.v1',
           eventUuid: '5a943eb6-4d4f-4c11-9962-08cf45e1697e',
           occurredAt: '2026-08-08T12:00:00.000Z',
@@ -53,7 +53,7 @@ describe(DeliveryRepository.name, () => {
     expect(query).toHaveBeenCalledTimes(1);
   });
 
-  it('stores a broadcast delivery without an audience UUID', async () => {
+  it('stores the route as a delivery channel', async () => {
     const query = jest.fn().mockResolvedValueOnce([{ event_uuid: 'event' }]).mockResolvedValueOnce([]);
     const dataSource = {
       transaction: jest.fn(async (operation) => operation({ query })),
@@ -62,7 +62,7 @@ describe(DeliveryRepository.name, () => {
 
     await repository.accept(
       {
-        audience: { type: 'broadcast' },
+        channel: 'products',
         eventType: 'product.updated',
         eventUuid: '5a943eb6-4d4f-4c11-9962-08cf45e1697e',
         occurredAt: '2026-08-08T12:00:00.000Z',
@@ -72,7 +72,6 @@ describe(DeliveryRepository.name, () => {
       new Date('2026-08-15T12:00:00.000Z'),
     );
 
-    expect(query.mock.calls[0][1][6]).toBeNull();
-    expect(query.mock.calls[0][1][7]).toBe('broadcast');
+    expect(query.mock.calls[0][1][5]).toBe('products');
   });
 });

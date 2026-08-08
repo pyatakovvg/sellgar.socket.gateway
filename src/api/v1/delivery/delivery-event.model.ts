@@ -1,9 +1,9 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
-import { DeliveryAudienceType } from './controller/dto/delivery-request.dto';
+import { DeliveryChannel } from './delivery.constants';
 
 @Entity('delivery_event')
-@Index(['audienceRoom', 'sequence'])
+@Index(['channel', 'sequence'])
 @Index(['expiresAt'])
 export class DeliveryEventModel {
   @PrimaryGeneratedColumn('increment', { name: 'sequence', type: 'bigint' })
@@ -24,14 +24,8 @@ export class DeliveryEventModel {
   @Column({ name: 'expires_at', type: 'timestamptz' })
   expiresAt!: Date;
 
-  @Column({ name: 'audience_type', type: 'varchar', length: 32 })
-  audienceType!: DeliveryAudienceType;
-
-  @Column({ name: 'audience_uuid', type: 'uuid', nullable: true })
-  audienceUuid!: string | null;
-
-  @Column({ name: 'audience_room', type: 'varchar', length: 80 })
-  audienceRoom!: string;
+  @Column({ type: 'varchar', length: 80 })
+  channel!: DeliveryChannel;
 
   @Column({ name: 'payload', type: 'jsonb' })
   payload!: Record<string, unknown>;

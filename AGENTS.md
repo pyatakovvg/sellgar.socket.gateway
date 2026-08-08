@@ -2,7 +2,7 @@
 
 `sellgar.socket.gateway` is the independently deployable realtime delivery edge.
 It persists transport-neutral delivery requests, fans them out to running
-instances and routes them to authenticated Socket.IO rooms.
+instances and routes them through authenticated physical Socket.IO connections.
 
 ## Structure
 
@@ -16,14 +16,15 @@ instances and routes them to authenticated Socket.IO rooms.
 ## Boundaries and guarantees
 
 - Domain ownership stays in producer services. This gateway owns persistence,
-  connection authentication, room routing, replay and delivery transport.
-- Never accept arbitrary room membership from an untrusted socket client.
+  connection authentication, transport-path routing, replay and delivery transport.
+- Keep domain streams on explicit server-owned Socket.IO paths. Never accept an
+  arbitrary channel or room from an untrusted socket client.
 - RabbitMQ ingress uses manual acknowledgement. ACK only after the PostgreSQL
   transaction has persisted both `delivery_event` and `delivery_outbox`.
 - PostgreSQL is the replay source of truth. Per-instance Rabbit queues are
   transient cluster fanout, not durable client storage.
 - Delivery is at least once within configured retention. Preserve `deliveryId`
-  and per-room `sequence`; do not claim exactly-once semantics.
+  and per-channel `sequence`; do not claim exactly-once semantics.
 - Do not add HTTP business APIs. HTTP is limited to operational endpoints.
 - Do not expose outbox retry without authentication and audit logging.
 
