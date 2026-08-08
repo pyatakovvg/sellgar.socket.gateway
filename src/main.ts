@@ -4,7 +4,7 @@ import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 
 import { AppModule } from '@/app.module';
-import { RealtimeIoAdapter } from '@/realtime/platform/realtime-io.adapter';
+import { SocketIoAdapter } from '@/api/v1/delivery/gateway/socket-io.adapter';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule);
@@ -18,7 +18,7 @@ async function bootstrap(): Promise<void> {
 
   app.enableShutdownHooks();
   app.enableCors({ credentials: true, origin: origins });
-  app.useWebSocketAdapter(new RealtimeIoAdapter(app, origins));
+  app.useWebSocketAdapter(new SocketIoAdapter(app, origins));
   app.useGlobalPipes(
     new ValidationPipe({
       forbidNonWhitelisted: true,
