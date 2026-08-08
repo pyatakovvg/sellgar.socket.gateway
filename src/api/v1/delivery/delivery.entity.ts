@@ -1,4 +1,4 @@
-import { DeliveryAudienceDto } from './controller/dto/delivery-request.dto';
+import { audienceRoom, DeliveryAudienceDto } from './controller/dto/delivery-request.dto';
 
 export interface DeliveryMessage {
   deliveryId: string;
@@ -12,7 +12,7 @@ export interface DeliveryMessage {
 }
 
 export function deliveryRoom(message: DeliveryMessage): string {
-  return `${message.audience.type}:${message.audience.uuid}`;
+  return audienceRoom(message.audience);
 }
 
 export function parseDeliveryMessage(value: unknown): DeliveryMessage {
@@ -32,7 +32,7 @@ export function parseDeliveryMessage(value: unknown): DeliveryMessage {
     typeof message.expiresAt !== 'string' ||
     !audience ||
     typeof audience.type !== 'string' ||
-    typeof audience.uuid !== 'string' ||
+    (audience.type !== 'broadcast' && typeof audience.uuid !== 'string') ||
     !message.payload ||
     typeof message.payload !== 'object'
   ) {

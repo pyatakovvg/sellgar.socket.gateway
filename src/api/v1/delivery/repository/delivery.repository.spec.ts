@@ -52,4 +52,27 @@ describe(DeliveryRepository.name, () => {
 
     expect(query).toHaveBeenCalledTimes(1);
   });
+
+  it('stores a broadcast delivery without an audience UUID', async () => {
+    const query = jest.fn().mockResolvedValueOnce([{ event_uuid: 'event' }]).mockResolvedValueOnce([]);
+    const dataSource = {
+      transaction: jest.fn(async (operation) => operation({ query })),
+    } as unknown as DataSource;
+    const repository = new DeliveryRepository(dataSource);
+
+    await repository.accept(
+      {
+        audience: { type: 'broadcast' },
+        eventType: 'product.updated',
+        eventUuid: '5a943eb6-4d4f-4c11-9962-08cf45e1697e',
+        occurredAt: '2026-08-08T12:00:00.000Z',
+        payload: { productUuid: '3a4752e0-c56d-4d72-8976-28438f680fb8', version: 2 },
+        schemaVersion: 1,
+      },
+      new Date('2026-08-15T12:00:00.000Z'),
+    );
+
+    expect(query.mock.calls[0][1][6]).toBeNull();
+    expect(query.mock.calls[0][1][7]).toBe('broadcast');
+  });
 });

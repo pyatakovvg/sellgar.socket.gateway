@@ -50,7 +50,7 @@ export class DeliveryRepository {
             request.occurredAt,
             expiresAt,
             request.audience.type,
-            request.audience.uuid,
+            request.audience.uuid ?? null,
             audienceRoom(request.audience),
             JSON.stringify(request.payload),
           ],
@@ -329,10 +329,13 @@ export class DeliveryRepository {
       schemaVersion: Number(row.schema_version),
       occurredAt: new Date(String(row.occurred_at)).toISOString(),
       expiresAt: new Date(String(row.expires_at)).toISOString(),
-      audience: {
-        type: String(row.audience_type) as DeliveryMessage['audience']['type'],
-        uuid: String(row.audience_uuid),
-      },
+      audience:
+        row.audience_type === 'broadcast'
+          ? { type: 'broadcast' }
+          : {
+              type: String(row.audience_type) as DeliveryMessage['audience']['type'],
+              uuid: String(row.audience_uuid),
+            },
       payload: row.payload as Record<string, unknown>,
     };
   }

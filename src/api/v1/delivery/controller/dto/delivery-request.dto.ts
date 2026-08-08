@@ -8,18 +8,22 @@ import {
   IsString,
   IsUUID,
   Min,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 
-export const DELIVERY_AUDIENCE_TYPES = ['user', 'tenant', 'shop', 'job'] as const;
+import { BROADCAST_ROOM } from '../../delivery.constants';
+
+export const DELIVERY_AUDIENCE_TYPES = ['broadcast', 'user', 'tenant', 'shop', 'job'] as const;
 export type DeliveryAudienceType = (typeof DELIVERY_AUDIENCE_TYPES)[number];
 
 export class DeliveryAudienceDto {
   @IsIn(DELIVERY_AUDIENCE_TYPES)
   type!: DeliveryAudienceType;
 
+  @ValidateIf((audience: DeliveryAudienceDto) => audience.type !== 'broadcast')
   @IsUUID()
-  uuid!: string;
+  uuid?: string;
 }
 
 export class DeliveryRequestDto {
@@ -49,5 +53,5 @@ export class DeliveryRequestDto {
 }
 
 export function audienceRoom(audience: DeliveryAudienceDto): string {
-  return `${audience.type}:${audience.uuid}`;
+  return audience.type === 'broadcast' ? BROADCAST_ROOM : `${audience.type}:${audience.uuid}`;
 }

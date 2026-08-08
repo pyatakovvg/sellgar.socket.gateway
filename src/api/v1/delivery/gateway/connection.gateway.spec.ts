@@ -20,12 +20,13 @@ const message: DeliveryMessage = {
 };
 
 describe(ConnectionGateway.name, () => {
+  const broadcastRoom = 'broadcast';
   const room = 'user:3a4752e0-c56d-4d72-8976-28438f680fb8';
 
   it('replays persisted deliveries before announcing readiness', async () => {
     const delivery = {
-      cursors: jest.fn().mockResolvedValue({ [room]: '0' }),
-      highWatermarks: jest.fn().mockResolvedValue({ [room]: '12' }),
+      cursors: jest.fn().mockResolvedValue({ [broadcastRoom]: '0', [room]: '0' }),
+      highWatermarks: jest.fn().mockResolvedValue({ [broadcastRoom]: '0', [room]: '12' }),
       replay: jest.fn().mockResolvedValue([message]),
     };
     const gateway = createGateway(delivery);
@@ -33,11 +34,11 @@ describe(ConnectionGateway.name, () => {
 
     await gateway.handleConnection(client);
 
-    expect(client.join).toHaveBeenCalledWith([room]);
+    expect(client.join).toHaveBeenCalledWith([broadcastRoom, room]);
     expect(client.emit).toHaveBeenNthCalledWith(1, DELIVERY_EVENT, message);
     expect(client.emit).toHaveBeenNthCalledWith(2, DELIVERY_READY_EVENT, {
-      cursors: { [room]: '0' },
-      watermarks: { [room]: '12' },
+      cursors: { [broadcastRoom]: '0', [room]: '0' },
+      watermarks: { [broadcastRoom]: '0', [room]: '12' },
     });
   });
 

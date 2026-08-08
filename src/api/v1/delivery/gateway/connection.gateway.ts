@@ -14,6 +14,7 @@ import { Namespace, Socket } from 'socket.io';
 
 import { DeliveryMessage, deliveryRoom } from '../delivery.entity';
 import {
+  BROADCAST_ROOM,
   CONNECTION_ERROR_EVENT,
   DELIVERY_ACK_EVENT,
   DELIVERY_EVENT,
@@ -67,7 +68,7 @@ export class ConnectionGateway implements OnGatewayConnection, OnGatewayDisconne
     }
 
     try {
-      const rooms = [`user:${principal.userUuid}`, ...principal.rooms];
+      const rooms = [BROADCAST_ROOM, `user:${principal.userUuid}`, ...principal.rooms];
       const cursors = await this.delivery.cursors(principal.sessionUuid, principal.userUuid, rooms);
       const state: ConnectionDeliveryState = {
         principal,

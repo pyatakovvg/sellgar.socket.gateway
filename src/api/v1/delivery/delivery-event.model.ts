@@ -27,8 +27,8 @@ export class DeliveryEventModel {
   @Column({ name: 'audience_type', type: 'varchar', length: 32 })
   audienceType!: DeliveryAudienceType;
 
-  @Column({ name: 'audience_uuid', type: 'uuid' })
-  audienceUuid!: string;
+  @Column({ name: 'audience_uuid', type: 'uuid', nullable: true })
+  audienceUuid!: string | null;
 
   @Column({ name: 'audience_room', type: 'varchar', length: 80 })
   audienceRoom!: string;

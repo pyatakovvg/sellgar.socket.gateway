@@ -1,7 +1,7 @@
 # Sellgar Socket Gateway
 
 Отдельный NestJS-сервис realtime-доставки. Он не содержит бизнес-логику доменных
-сервисов: принимает адресованные события из RabbitMQ, сохраняет их в PostgreSQL,
+сервисов: принимает broadcast и адресованные события из RabbitMQ, сохраняет их в PostgreSQL,
 распределяет по экземплярам gateway и доставляет авторизованным Socket.IO-клиентам.
 
 ## Структура
@@ -41,8 +41,8 @@ application services.
 
 1. Доменный сервис в одной бизнес-транзакции изменяет свои данные и создаёт
    запись в своём producer-outbox.
-2. Producer-outbox публикует `realtime.delivery.requested.v1` в RabbitMQ.
-3. Socket gateway принимает сообщение с manual ACK.
+2. Producer-outbox публикует доменное событие или `realtime.delivery.requested.v1` в RabbitMQ.
+3. Socket gateway преобразует поддерживаемое доменное событие в delivery и принимает сообщение с manual ACK.
 4. В одной транзакции `socket_srv` создаются `delivery_event` и
    `delivery_outbox`. Повторный `eventUuid` безопасно игнорируется.
 5. Только после commit gateway отправляет RabbitMQ ACK.
@@ -116,8 +116,15 @@ transactional outbox:
 }
 ```
 
-Допустимые audience: `user`, `tenant`, `shop`, `job`. Доменный сервис не знает
-socket IDs и не формирует room membership.
+Допустимые audience: `broadcast`, `user`, `tenant`, `shop`, `job`. Для broadcast
+используется `{ "type": "broadcast" }` без искусственного UUID. Доменный сервис
+не знает socket IDs и не формирует room membership.
+
+Событие `product.updated` принимается напрямую из transactional outbox
+`product_srv` и преобразуется gateway в broadcast delivery с payload
+`{ "productUuid": "<aggregateUuid>", "version": <aggregateVersion> }`.
+RabbitMQ ACK отправляется только после фиксации delivery и gateway-outbox в
+`socket_srv`.
 
 ## Socket.IO contract
 
@@ -136,6 +143,10 @@ claims: user UUID в `sub`, стабильный UUID сессии в `sid`, aud
   "exp": 1786190460
 }
 ```
+
+Каждое успешно авторизованное соединение автоматически вступает в системную
+room `broadcast`. Поэтому broadcast-событие получают все активные соединения;
+никакая подписка на канал со стороны продукта или UI для этого не требуется.
 
 События протокола:
 
