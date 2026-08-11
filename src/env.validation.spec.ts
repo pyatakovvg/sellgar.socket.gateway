@@ -8,7 +8,7 @@ const validConfig = {
   AMQP_SOCKET_GATEWAY_DEAD_LETTER_EXCHANGE: 'socket_gateway.dead-letter.exchange',
   AMQP_SOCKET_GATEWAY_DISPATCH_EXCHANGE: 'socket_gateway.dispatch.exchange',
   AMQP_SOCKET_GATEWAY_EVENT_EXCHANGE: 'event.exchange',
-  AMQP_SOCKET_GATEWAY_EVENT_QUEUE: 'socket_gateway.event.queue',
+  AMQP_SOCKET_GATEWAY_DELIVERY_QUEUE: 'socket_gateway.delivery.queue',
   AMQP_USERNAME: 'admin',
   DATABASE_DATABASE_NAME: 'socket_srv',
   DATABASE_HOST: 'localhost',
@@ -41,10 +41,10 @@ describe(validateEnv.name, () => {
   });
 
   it('rejects a missing required gateway variable', () => {
-    const { AMQP_SOCKET_GATEWAY_EVENT_QUEUE: _, ...config } = validConfig;
+    const { AMQP_SOCKET_GATEWAY_DELIVERY_QUEUE: _, ...config } = validConfig;
 
     expect(() => validateEnv(config)).toThrow(
-      'Missing required environment variable: AMQP_SOCKET_GATEWAY_EVENT_QUEUE',
+      'Missing required environment variable: AMQP_SOCKET_GATEWAY_DELIVERY_QUEUE',
     );
   });
 });

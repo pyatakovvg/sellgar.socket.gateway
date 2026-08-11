@@ -42,18 +42,19 @@ application services.
 
 1. Доменный сервис в одной бизнес-транзакции изменяет свои данные и создаёт
    запись в своём producer-outbox.
-2. Producer-outbox публикует доменное событие или `realtime.delivery.requested.v1` в RabbitMQ.
-3. Socket gateway преобразует поддерживаемое доменное событие в delivery и принимает сообщение с manual ACK.
-4. В одной транзакции `socket_srv` создаются `delivery_event` и
+2. Producer-outbox публикует доменное событие в RabbitMQ.
+3. Владелец клиентской read model преобразует его в `realtime.delivery.requested.v1`.
+4. Socket gateway принимает только готовый delivery request с manual ACK.
+5. В одной транзакции `socket_srv` создаются `delivery_event` и
    `delivery_outbox`. Повторный `eventUuid` безопасно игнорируется.
-5. Только после commit gateway отправляет RabbitMQ ACK.
-6. Relay выбирает outbox-записи через `FOR UPDATE SKIP LOCKED`, публикует их в
+6. Только после commit gateway отправляет RabbitMQ ACK.
+7. Relay выбирает outbox-записи через `FOR UPDATE SKIP LOCKED`, публикует их в
    cluster exchange с publisher confirm и фиксирует `published`.
-7. Каждый экземпляр gateway имеет собственную временную очередь cluster fanout
+8. Каждый экземпляр gateway имеет собственную временную очередь cluster fanout
    и отправляет событие только своим локальным соединениям.
-8. Клиент подтверждает обработку. Cursor хранится отдельно для каждой пары
+9. Клиент подтверждает обработку. Cursor хранится отдельно для каждой пары
    `session_uuid + channel`.
-9. После reconnect gateway фиксирует high-watermark выбранного transport-канала,
+10. После reconnect gateway фиксирует high-watermark выбранного transport-канала,
    восстанавливает его события из PostgreSQL и затем выпускает накопившиеся
    live-события.
 
@@ -98,8 +99,8 @@ audit log.
 
 ## RabbitMQ contract
 
-Producer публикует `realtime.delivery.requested.v1` через собственный
-transactional outbox:
+Владелец клиентской read model публикует `realtime.delivery.requested.v1` после
+валидации и нормализации доменного события:
 
 ```json
 {
@@ -118,16 +119,17 @@ transactional outbox:
 и публикует только имя канала; все клиенты соответствующего transport-соединения
 получают событие.
 
-Событие `product.updated` принимается напрямую из transactional outbox
-`product_srv` и преобразуется gateway в delivery канала `products`. Начиная со
-`schemaVersion: 2`, payload содержит полную актуальную модель продукта и
-передаётся frontend без дополнительного HTTP-запроса.
-RabbitMQ ACK отправляется только после фиксации delivery и gateway-outbox в
-`socket_srv`.
+Для admin frontend события `product.updated` и `store.product.updated`
+нормализует Admin Gateway. Payload имеет тот же admin-facing entity contract,
+что и соответствующий HTTP-ответ. Socket Gateway не знает доменные envelopes,
+snapshots и правила сборки read model; он принимает только единый delivery
+contract. RabbitMQ ACK отправляется только после фиксации delivery и
+gateway-outbox в `socket_srv`.
 
-Событие `store.product.updated` из transactional outbox `store_srv` аналогично
-преобразуется в delivery канала `offers` с payload
-`{ "storeProductUuid": "<aggregateUuid>", "version": <aggregateVersion> }`.
+Ingress использует очередь `AMQP_SOCKET_GATEWAY_DELIVERY_QUEUE`. Это отдельная
+очередь готовых delivery requests: прежняя domain-event очередь не
+переиспользуется, потому что её durable bindings сохраняются в RabbitMQ после
+удаления handlers из приложения.
 
 ## Socket.IO contract
 

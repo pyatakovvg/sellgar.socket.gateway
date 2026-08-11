@@ -1,6 +1,4 @@
 export const DELIVERY_REQUESTED_PATTERN = 'realtime.delivery.requested.v1';
-export const PRODUCT_UPDATED_PATTERN = 'product.updated';
-export const STORE_PRODUCT_UPDATED_PATTERN = 'store.product.updated';
 export const DELIVERY_CHANNELS = ['products', 'offers'] as const;
 export type DeliveryChannel = (typeof DELIVERY_CHANNELS)[number];
 export const PRODUCTS_SOCKET_PATH = '/socket.io/products';

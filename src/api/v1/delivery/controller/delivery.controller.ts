@@ -3,15 +3,9 @@ import { Ctx, EventPattern, Payload, RmqContext } from '@nestjs/microservices';
 import { plainToInstance } from 'class-transformer';
 import { ValidationError, validateOrReject } from 'class-validator';
 
-import {
-  DELIVERY_REQUESTED_PATTERN,
-  PRODUCT_UPDATED_PATTERN,
-  STORE_PRODUCT_UPDATED_PATTERN,
-} from '../delivery.constants';
+import { DELIVERY_REQUESTED_PATTERN } from '../delivery.constants';
 import { DeliveryService } from '../service/delivery.service';
 import { DeliveryRequestDto } from './dto/delivery-request.dto';
-import { ProductUpdatedEventDto } from './dto/product-updated-event.dto';
-import { StoreProductUpdatedEventDto } from './dto/store-product-updated-event.dto';
 
 @Controller()
 export class DeliveryController {
@@ -25,47 +19,6 @@ export class DeliveryController {
       const event = plainToInstance(DeliveryRequestDto, payload);
       await validateOrReject(event, { forbidNonWhitelisted: true, whitelist: true });
       await this.delivery.accept(event);
-    });
-  }
-
-  @EventPattern(PRODUCT_UPDATED_PATTERN)
-  async handleProductUpdated(@Payload() payload: unknown, @Ctx() context: RmqContext): Promise<void> {
-    await this.consume(context, async () => {
-      const event = plainToInstance(ProductUpdatedEventDto, payload);
-      await validateOrReject(event, { forbidNonWhitelisted: true, whitelist: true });
-
-      await this.delivery.accept(
-        plainToInstance(DeliveryRequestDto, {
-          eventUuid: event.eventUuid,
-          eventType: event.eventType,
-          schemaVersion: event.schemaVersion,
-          occurredAt: event.occurredAt,
-          channel: 'products',
-          payload: event.payload,
-        }),
-      );
-    });
-  }
-
-  @EventPattern(STORE_PRODUCT_UPDATED_PATTERN)
-  async handleStoreProductUpdated(@Payload() payload: unknown, @Ctx() context: RmqContext): Promise<void> {
-    await this.consume(context, async () => {
-      const event = plainToInstance(StoreProductUpdatedEventDto, payload);
-      await validateOrReject(event, { forbidNonWhitelisted: true, whitelist: true });
-
-      await this.delivery.accept(
-        plainToInstance(DeliveryRequestDto, {
-          eventUuid: event.eventUuid,
-          eventType: event.eventType,
-          schemaVersion: event.schemaVersion,
-          occurredAt: event.occurredAt,
-          channel: 'offers',
-          payload: {
-            storeProductUuid: event.aggregateUuid,
-            version: event.aggregateVersion,
-          },
-        }),
-      );
     });
   }
 

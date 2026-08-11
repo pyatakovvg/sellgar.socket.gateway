@@ -40,7 +40,7 @@ async function bootstrap(): Promise<void> {
       ],
       exchange: config.getOrThrow<string>('AMQP_SOCKET_GATEWAY_EVENT_EXCHANGE'),
       exchangeType: 'topic',
-      queue: config.getOrThrow<string>('AMQP_SOCKET_GATEWAY_EVENT_QUEUE'),
+      queue: config.getOrThrow<string>('AMQP_SOCKET_GATEWAY_DELIVERY_QUEUE'),
       queueOptions: {
         durable: true,
         arguments: {
