@@ -41,10 +41,7 @@ export class DeliveryController {
           schemaVersion: event.schemaVersion,
           occurredAt: event.occurredAt,
           channel: 'products',
-          payload: {
-            productUuid: event.aggregateUuid,
-            version: event.aggregateVersion,
-          },
+          payload: event.payload,
         }),
       );
     });

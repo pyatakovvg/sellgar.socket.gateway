@@ -13,18 +13,24 @@ describe(DeliveryController.name, () => {
       getMessage: () => message,
     } as unknown as RmqContext;
     const controller = new DeliveryController({ accept } as unknown as DeliveryService);
+    const product = {
+      name: 'Product',
+      status: 'active',
+      uuid: '3a4752e0-c56d-4d72-8976-28438f680fb8',
+      version: 7,
+    };
 
     await controller.handleProductUpdated(
       {
         eventUuid: '5a943eb6-4d4f-4c11-9962-08cf45e1697e',
         eventType: 'product.updated',
-        schemaVersion: 1,
+        schemaVersion: 2,
         producer: 'product_srv',
         aggregateType: 'product',
         aggregateUuid: '3a4752e0-c56d-4d72-8976-28438f680fb8',
         aggregateVersion: 7,
         occurredAt: '2026-08-08T12:00:00.000Z',
-        payload: { name: 'Product', status: 'active' },
+        payload: product,
       },
       context,
     );
@@ -34,10 +40,8 @@ describe(DeliveryController.name, () => {
         channel: 'products',
         eventType: 'product.updated',
         eventUuid: '5a943eb6-4d4f-4c11-9962-08cf45e1697e',
-        payload: {
-          productUuid: '3a4752e0-c56d-4d72-8976-28438f680fb8',
-          version: 7,
-        },
+        payload: product,
+        schemaVersion: 2,
       }),
     );
     expect(channel.ack).toHaveBeenCalledWith(message);

@@ -119,8 +119,9 @@ transactional outbox:
 получают событие.
 
 Событие `product.updated` принимается напрямую из transactional outbox
-`product_srv` и преобразуется gateway в delivery канала `products` с payload
-`{ "productUuid": "<aggregateUuid>", "version": <aggregateVersion> }`.
+`product_srv` и преобразуется gateway в delivery канала `products`. Начиная со
+`schemaVersion: 2`, payload содержит полную актуальную модель продукта и
+передаётся frontend без дополнительного HTTP-запроса.
 RabbitMQ ACK отправляется только после фиксации delivery и gateway-outbox в
 `socket_srv`.
 
