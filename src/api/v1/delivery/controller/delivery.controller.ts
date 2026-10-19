@@ -13,7 +13,7 @@ export class DeliveryController {
 
   constructor(private readonly delivery: DeliveryService) {}
 
-  @EventPattern(DELIVERY_REQUESTED_PATTERN)
+  @EventPattern<string>(DELIVERY_REQUESTED_PATTERN)
   async handle(@Payload() payload: unknown, @Ctx() context: RmqContext): Promise<void> {
     await this.consume(context, async () => {
       const event = plainToInstance(DeliveryRequestDto, payload);

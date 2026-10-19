@@ -1,6 +1,6 @@
 import { INestApplicationContext } from '@nestjs/common';
 import { IoAdapter } from '@nestjs/platform-socket.io';
-import { ServerOptions } from 'socket.io';
+import { Server, ServerOptions } from 'socket.io';
 
 export class SocketIoAdapter extends IoAdapter {
   constructor(
@@ -10,8 +10,8 @@ export class SocketIoAdapter extends IoAdapter {
     super(app);
   }
 
-  createIOServer(port: number, options?: ServerOptions): unknown {
-    return super.createIOServer(port, {
+  override createIOServer(port: number, options?: Partial<ServerOptions>): Server {
+    return new Server(this.httpServer && port === 0 ? this.httpServer : port, {
       ...options,
       cors: { credentials: true, origin: this.origins },
       transports: ['websocket'],
