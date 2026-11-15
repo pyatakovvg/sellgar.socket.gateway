@@ -35,3 +35,9 @@ yarn build
 yarn test --runInBand
 yarn migration:show
 ```
+
+## Категории Store
+
+Канал categories доставляется по /socket.io/categories через CategoriesConnectionGateway.
+Использует общий authenticated ticket, durable delivery, replay и ACK; отдельной
+бизнес-обработки категорий на socket edge нет.
