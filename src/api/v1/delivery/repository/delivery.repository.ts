@@ -36,9 +36,10 @@ export class DeliveryRepository {
               occurred_at,
               expires_at,
               channel,
-              payload
+              payload,
+              owner_uuid
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+            VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)
             ON CONFLICT (event_uuid) DO NOTHING
             RETURNING event_uuid
           `,
@@ -50,6 +51,7 @@ export class DeliveryRepository {
             expiresAt,
             request.channel,
             JSON.stringify(request.payload),
+            request.ownerUuid ?? null,
           ],
         ),
       );
@@ -107,6 +109,7 @@ export class DeliveryRepository {
                   JOIN delivery_event AS current_event
                     ON current_event.event_uuid = delivery_outbox.event_uuid
                   WHERE earlier_event.channel = current_event.channel
+                    AND earlier_event.owner_uuid IS NOT DISTINCT FROM current_event.owner_uuid
                     AND earlier_event.sequence < current_event.sequence
                     AND earlier_outbox.status <> 'published'
                 )
@@ -130,6 +133,7 @@ export class DeliveryRepository {
               event.occurred_at,
               event.expires_at,
               event.channel,
+              event.owner_uuid,
               event.payload,
               outbox.attempts
           `,
@@ -137,7 +141,10 @@ export class DeliveryRepository {
         ),
       );
 
-      return rows.map((row) => ({ ...this.message(row), attempts: Number(row.attempts) }));
+      return rows.map((row) => ({
+        ...this.message(row),
+        attempts: Number(row.attempts),
+      }));
     });
   }
 
@@ -157,13 +164,7 @@ export class DeliveryRepository {
     );
   }
 
-  markFailed(
-    eventUuid: string,
-    attempts: number,
-    retryAt: Date,
-    error: unknown,
-    terminal: boolean,
-  ): Promise<unknown> {
+  markFailed(eventUuid: string, attempts: number, retryAt: Date, error: unknown, terminal: boolean): Promise<unknown> {
     return this.dataSource.manager.query(
       `
         UPDATE delivery_outbox
@@ -175,11 +176,17 @@ export class DeliveryRepository {
           last_error = $4
         WHERE event_uuid = $1
       `,
-      [eventUuid, attempts + 1, retryAt, error instanceof Error ? error.message : String(error), terminal ? 'dead' : 'failed'],
+      [
+        eventUuid,
+        attempts + 1,
+        retryAt,
+        error instanceof Error ? error.message : String(error),
+        terminal ? 'dead' : 'failed',
+      ],
     );
   }
 
-  async getOrCreateCursor(sessionUuid: string, userUuid: string, channel: DeliveryChannel): Promise<string> {
+  async getOrCreateCursor(sessionUuid: string, userUuid: string | null, channel: DeliveryChannel): Promise<string> {
     return this.dataSource.transaction(async (manager) => {
       await manager.query(
         `
@@ -202,7 +209,7 @@ export class DeliveryRepository {
           [sessionUuid, channel],
         ),
       );
-      if (!row || String(row.user_uuid) !== userUuid) {
+      if (!row || row.user_uuid !== userUuid) {
         throw new Error('Socket session belongs to another user');
       }
 
@@ -210,7 +217,12 @@ export class DeliveryRepository {
     });
   }
 
-  acknowledge(sessionUuid: string, userUuid: string, channel: DeliveryChannel, sequence: string): Promise<unknown> {
+  acknowledge(
+    sessionUuid: string,
+    userUuid: string | null,
+    channel: DeliveryChannel,
+    sequence: string,
+  ): Promise<unknown> {
     return this.dataSource.manager.query(
       `
         UPDATE delivery_cursor
@@ -218,24 +230,30 @@ export class DeliveryRepository {
           sequence = GREATEST(sequence, $4::bigint),
           acknowledged_at = NOW()
         WHERE session_uuid = $1
-          AND user_uuid = $2
+          AND user_uuid IS NOT DISTINCT FROM $2::uuid
           AND channel = $3
       `,
       [sessionUuid, userUuid, channel, sequence],
     );
   }
 
-  async highWatermark(channel: DeliveryChannel): Promise<string> {
+  async highWatermark(channel: DeliveryChannel, ownerUuid?: string): Promise<string> {
     const [row] = this.rows(
       await this.dataSource.manager.query(
-        'SELECT COALESCE(MAX(sequence), 0) AS sequence FROM delivery_event WHERE channel = $1',
-        [channel],
+        'SELECT COALESCE(MAX(sequence), 0) AS sequence FROM delivery_event WHERE channel = $1 AND owner_uuid IS NOT DISTINCT FROM $2::uuid',
+        [channel, ownerUuid ?? null],
       ),
     );
     return String(row?.sequence ?? '0');
   }
 
-  async replay(channel: DeliveryChannel, after: string, upTo: string, limit: number): Promise<DeliveryMessage[]> {
+  async replay(
+    channel: DeliveryChannel,
+    after: string,
+    upTo: string,
+    limit: number,
+    ownerUuid?: string,
+  ): Promise<DeliveryMessage[]> {
     const rows = this.rows(
       await this.dataSource.manager.query(
         `
@@ -247,16 +265,18 @@ export class DeliveryRepository {
             occurred_at,
             expires_at,
             channel,
+            owner_uuid,
             payload
           FROM delivery_event
           WHERE channel = $1
+            AND owner_uuid IS NOT DISTINCT FROM $5::uuid
             AND sequence > $2::bigint
             AND sequence <= $3::bigint
             AND expires_at > NOW()
           ORDER BY sequence ASC
           LIMIT $4
         `,
-        [channel, after, upTo, limit],
+        [channel, after, upTo, limit, ownerUuid ?? null],
       ),
     );
 
@@ -309,6 +329,7 @@ export class DeliveryRepository {
   private message(row: QueryRow): DeliveryMessage {
     return {
       channel: String(row.channel) as DeliveryChannel,
+      ...(row.owner_uuid ? { ownerUuid: String(row.owner_uuid) } : {}),
       deliveryId: String(row.event_uuid),
       sequence: String(row.sequence),
       eventType: String(row.event_type),

@@ -41,3 +41,19 @@ yarn migration:show
 Канал categories доставляется по /socket.io/categories через CategoriesConnectionGateway.
 Использует общий authenticated ticket, durable delivery, replay и ACK; отдельной
 бизнес-обработки категорий на socket edge нет.
+
+## Приватные корзины
+
+Канал carts использует /socket.io/carts. ownerUuid обязателен для carts и запрещен
+для broadcast; хранится delivery_event.owner_uuid и проверяется одинаково в SQL
+watermark/replay и в live/pending/emit. Routing owner не пересылается браузеру.
+Cart-only ticket имеет sub/sid/oid/scope=carts/exp; обычный admin ticket не открывает
+carts, Cart ticket не открывает admin каналы. Identity session.check проверяет
+client_gw-сессию при handshake и перед private replay/live; при отказе/недоступности
+доставка прекращается и соединение закрывается, cursor не продвигается.
+Срок Cart ticket проверяется только в handshake. Отдельного Cart таймера нет: используется общий lifecycle соединения. Актуальные status/owner/user/expiresAt Identity проверяются перед private replay/live; истёкшая сессия не получает данные. Пассивная проверка не продлевает сессию. Авторизованные аккаунты используют
+существующий user-bound cursor per session/channel; гость использует тот же session/channel cursor с user_uuid=null.
+Guest ticket без sub допускается только для owner-bound Cart scope после проверки Identity; admin broadcast требует пользователя.
+Применить также GuestSessionCursors1794870001000. Пассивные проверки не продлевают гостевой срок.
+Применить PrivateCartDelivery1794850000000. Tests: yarn test:integration создает
+только случайные socket_cart_test_* schemas.

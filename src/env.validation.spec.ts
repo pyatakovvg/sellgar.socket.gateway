@@ -10,6 +10,7 @@ const validConfig = {
   AMQP_SOCKET_GATEWAY_EVENT_EXCHANGE: 'event.exchange',
   AMQP_SOCKET_GATEWAY_DELIVERY_QUEUE: 'socket_gateway.delivery.queue',
   AMQP_USERNAME: 'admin',
+  AMQP_IDENTITY_SRV_COMMAND_QUEUE: 'identity.test',
   DATABASE_DATABASE_NAME: 'socket_srv',
   DATABASE_HOST: 'localhost',
   DATABASE_PASSWORD: 'admin',

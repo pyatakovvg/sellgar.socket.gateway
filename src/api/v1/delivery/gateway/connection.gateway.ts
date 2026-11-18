@@ -40,6 +40,7 @@ export class ConnectionGateway
 
   private readonly logger = new Logger(ConnectionGateway.name);
   private unsubscribe?: () => void;
+  private readonly dispatches = new Map<string, Promise<void>>();
 
   constructor(
     private readonly channel: DeliveryChannel,
@@ -59,19 +60,25 @@ export class ConnectionGateway
       void this.tickets
         .verify(client.handshake.auth?.ticket)
         .then((principal) => {
+          if (this.channel === 'carts' ? !principal.ownerUuid : principal.ownerUuid !== undefined) {
+            throw new Error('Ticket cannot access this transport');
+          }
           client.data.principal = principal;
           next();
         })
         .catch(() => {
-          const error = new Error('Unauthorized') as Error & { data: { code: string } };
+          const error = new Error('Unauthorized') as Error & {
+            data: { code: string };
+          };
           error.data = { code: 'UNAUTHORIZED' };
           next(error);
         });
     });
   }
 
-  onModuleDestroy(): void {
+  async onModuleDestroy(): Promise<void> {
     this.unsubscribe?.();
+    await Promise.allSettled(this.dispatches.values());
   }
 
   async handleConnection(client: Socket): Promise<void> {
@@ -89,11 +96,18 @@ export class ConnectionGateway
       };
       client.data.delivery = state;
 
-      const watermark = await this.delivery.highWatermark(this.channel);
+      const watermark =
+        this.channel === 'carts'
+          ? await this.delivery.highWatermark(this.channel, principal.ownerUuid)
+          : await this.delivery.highWatermark(this.channel);
       await this.replay(client, state, watermark);
       state.replaying = false;
       this.flushPending(client, state);
-      client.emit(DELIVERY_READY_EVENT, { channel: this.channel, cursor: state.cursor, watermark });
+      client.emit(DELIVERY_READY_EVENT, {
+        channel: this.channel,
+        cursor: state.cursor,
+        watermark,
+      });
       this.logger.debug(`Connected ${this.channel} socket ${client.id} for session ${principal.sessionUuid}`);
     } catch (error) {
       this.logger.error(`Failed to recover socket ${client.id}`, error instanceof Error ? error.stack : undefined);
@@ -129,11 +143,21 @@ export class ConnectionGateway
     return { sequence: state.cursor };
   }
 
-  async dispatch(message: DeliveryMessage): Promise<void> {
+  dispatch(message: DeliveryMessage): Promise<void> {
     if (message.channel !== this.channel || new Date(message.expiresAt).getTime() <= Date.now()) {
-      return;
+      return Promise.resolve();
     }
 
+    const stream = message.ownerUuid ?? '';
+    const previous = this.dispatches.get(stream) ?? Promise.resolve();
+    const next = previous.catch(() => undefined).then(() => this.dispatchToOwner(message));
+    this.dispatches.set(stream, next);
+    return next.finally(() => {
+      if (this.dispatches.get(stream) === next) this.dispatches.delete(stream);
+    });
+  }
+
+  private async dispatchToOwner(message: DeliveryMessage): Promise<void> {
     const sockets = await this.server.fetchSockets();
     for (const socket of sockets) {
       const client = socket as unknown as Socket;
@@ -142,6 +166,15 @@ export class ConnectionGateway
         continue;
       }
 
+      if (!this.visible(state, message)) continue;
+      if (this.channel === 'carts') {
+        try {
+          await this.tickets.assertActive(state.principal);
+        } catch {
+          client.disconnect(true);
+          continue;
+        }
+      }
       if (state.replaying) {
         state.pending.set(message.sequence, message);
         if (state.pending.size > this.config.getOrThrow<number>('DELIVERY_REPLAY_PENDING_MAX')) {
@@ -158,7 +191,11 @@ export class ConnectionGateway
   private async replay(client: Socket, state: ConnectionDeliveryState, watermark: string): Promise<void> {
     let after = state.cursor;
     while (BigInt(after) < BigInt(watermark)) {
-      const messages = await this.delivery.replay(state.channel, after, watermark);
+      if (state.channel === 'carts') await this.tickets.assertActive(state.principal);
+      const messages =
+        state.channel === 'carts'
+          ? await this.delivery.replay(state.channel, after, watermark, state.principal.ownerUuid)
+          : await this.delivery.replay(state.channel, after, watermark);
       if (messages.length === 0) {
         break;
       }
@@ -180,11 +217,21 @@ export class ConnectionGateway
   }
 
   private emitDelivery(client: Socket, state: ConnectionDeliveryState, message: DeliveryMessage): void {
-    if (message.channel !== state.channel || BigInt(message.sequence) <= BigInt(state.lastSent)) {
+    if (!this.visible(state, message) || BigInt(message.sequence) <= BigInt(state.lastSent)) {
       return;
     }
-    client.emit(DELIVERY_EVENT, message);
+    const { ownerUuid: _owner, ...publicMessage } = message;
+    client.emit(DELIVERY_EVENT, publicMessage);
     state.lastSent = message.sequence;
+  }
+
+  private visible(state: ConnectionDeliveryState, message: DeliveryMessage): boolean {
+    return (
+      message.channel === state.channel &&
+      (state.channel === 'carts'
+        ? !!state.principal.ownerUuid && message.ownerUuid === state.principal.ownerUuid
+        : message.ownerUuid === undefined)
+    );
   }
 
   private state(client: Socket): ConnectionDeliveryState {

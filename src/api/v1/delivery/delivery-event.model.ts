@@ -27,6 +27,9 @@ export class DeliveryEventModel {
   @Column({ type: 'varchar', length: 80 })
   channel!: DeliveryChannel;
 
+  @Column({ name: 'owner_uuid', type: 'uuid', nullable: true })
+  ownerUuid!: string | null;
+
   @Column({ name: 'payload', type: 'jsonb' })
   payload!: Record<string, unknown>;
 

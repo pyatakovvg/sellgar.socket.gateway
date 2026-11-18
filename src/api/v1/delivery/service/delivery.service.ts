@@ -27,24 +27,30 @@ export class DeliveryService {
     return this.repository.accept(event, expiresAt);
   }
 
-  cursor(sessionUuid: string, userUuid: string, channel: DeliveryChannel): Promise<string> {
+  cursor(sessionUuid: string, userUuid: string | null, channel: DeliveryChannel): Promise<string> {
     return this.repository.getOrCreateCursor(sessionUuid, userUuid, channel);
   }
 
-  acknowledge(sessionUuid: string, userUuid: string, channel: DeliveryChannel, sequence: string): Promise<unknown> {
+  acknowledge(
+    sessionUuid: string,
+    userUuid: string | null,
+    channel: DeliveryChannel,
+    sequence: string,
+  ): Promise<unknown> {
     return this.repository.acknowledge(sessionUuid, userUuid, channel, sequence);
   }
 
-  highWatermark(channel: DeliveryChannel): Promise<string> {
-    return this.repository.highWatermark(channel);
+  highWatermark(channel: DeliveryChannel, ownerUuid?: string): Promise<string> {
+    return this.repository.highWatermark(channel, ownerUuid);
   }
 
-  replay(channel: DeliveryChannel, after: string, upTo: string): Promise<DeliveryMessage[]> {
+  replay(channel: DeliveryChannel, after: string, upTo: string, ownerUuid?: string): Promise<DeliveryMessage[]> {
     return this.repository.replay(
       channel,
       after,
       upTo,
       this.config.getOrThrow<number>('DELIVERY_REPLAY_BATCH_SIZE'),
+      ownerUuid,
     );
   }
 }

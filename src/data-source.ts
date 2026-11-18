@@ -1,4 +1,5 @@
 import 'dotenv/config';
+import { GuestSessionCursors1794870001000 } from './migrations/1794870001000-guest-session-cursors';
 import { DataSource } from 'typeorm';
 
 import { DeliveryCursorModel } from './api/v1/delivery/delivery-cursor.model';
@@ -8,6 +9,7 @@ import { DurableDelivery1786200000000 } from './migrations/1786200000000-durable
 import { BroadcastDelivery1786201000000 } from './migrations/1786201000000-broadcast-delivery';
 import { ChannelDelivery1786202000000 } from './migrations/1786202000000-channel-delivery';
 import { NormalizedRealtimeDelivery1786347000000 } from './migrations/1786347000000-normalized-realtime-delivery';
+import { PrivateCartDelivery1794850000000 } from './migrations/1794850000000-private-cart-delivery';
 
 declare const process: { env: Record<string, string | undefined> };
 
@@ -24,6 +26,8 @@ export default new DataSource({
     BroadcastDelivery1786201000000,
     ChannelDelivery1786202000000,
     NormalizedRealtimeDelivery1786347000000,
+    PrivateCartDelivery1794850000000,
+    GuestSessionCursors1794870001000,
   ],
   migrationsTableName: 'typeorm_migrations',
   synchronize: false,

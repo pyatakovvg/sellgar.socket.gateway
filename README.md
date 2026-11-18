@@ -115,9 +115,9 @@ audit log.
 }
 ```
 
-Сейчас поддерживаются каналы `products` и `offers`. Producer не знает socket IDs
-и публикует только имя канала; все клиенты соответствующего transport-соединения
-получают событие.
+Поддерживаются каналы `products`, `offers`, `categories` и приватный `carts`.
+В broadcast-каналах все авторизованные клиенты соответствующего transport получают
+событие. Cart требует серверный ownerUuid и доставляется только этому владельцу.
 
 Для admin frontend события `product.updated` и `store.product.updated`
 нормализует Admin Gateway. Payload имеет тот же admin-facing entity contract,
@@ -198,3 +198,37 @@ yarn build
 yarn test --runInBand
 yarn migration:show
 ```
+
+## Приватный Cart transport
+
+`/socket.io/carts` использует ту же durable delivery/outbox/replay/ACK инфраструктуру.
+Для `channel=carts` delivery request обязательно содержит верхнеуровневый ownerUuid;
+для остальных каналов он запрещен. DB check страхует HTTP/RMQ validation.
+`delivery_event.owner_uuid` и частичный индекс ограничивают replay и watermark
+адресатом. Outbox сохраняет порядок внутри канала и владельца; dead одного
+владельца не блокирует остальных. В cluster envelope адресат сохраняется, перед
+Socket.IO emit удаляется. Клиент не выбирает owner/room/query subscription.
+
+Client Gateway выдает `/v1/auth/socket-ticket` посетителю с действующей сессией:
+sub=userUuid (отсутствует у гостя), sid=sessionUuid, oid=ownerUuid, scope=carts, exp. TTL до 60 секунд,
+ограничен expiresAt Identity. Socket проверяет подпись/audience/HS256, изоляцию
+transport scope и `identity.session.check` по sid. Identity проверяет client_gw
+сессию; userId/ownerUuid должны совпасть с ticket. Перед private replay/live
+проверка повторяется. Отзыв сессии, expiry или недоступность Identity закрывает
+соединение до следующей доставки, не меняя cursor; после восстановления доступен
+replay. Срок ticket проверяется только при handshake. Отдельного Cart таймера нет.
+Общий lifecycle соединения совпадает с административными каналами; перед
+private replay/live проверяются актуальные status/owner/user/expiresAt Identity.
+Для настоящего reconnect нужен
+новый ticket. Broadcast admin ticket не открывает private Cart,
+Cart ticket не открывает административные потоки.
+
+Поддерживаются аккаунты и гости. У гостевого cursor user_uuid=null, session_uuid
+остаётся реальным UUID Identity; фиктивного пользователя нет. У аккаунтов изменение
+одной сессии не продвигает cursors других устройств. Guest ticket без sub запрещён
+в административных broadcast-каналах. Применить GuestSessionCursors1794870001000. Корзины разных магазинов
+идентифицируются cartUuid/shopUuid в payload и не переключают контекст клиента.
+
+Миграция: `yarn migration:run`. Проверки: `yarn build`, `yarn test --runInBand`,
+`yarn test:integration`. Последняя команда использует случайную схему PostgreSQL.
+Полная цепочка из workspace: `node agent/scripts/smoke-client-cart-socket.cjs`.

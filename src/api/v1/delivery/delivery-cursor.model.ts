@@ -9,12 +9,16 @@ export class DeliveryCursorModel {
   @PrimaryColumn({ type: 'varchar', length: 80 })
   channel!: string;
 
-  @Column({ name: 'user_uuid', type: 'uuid' })
-  userUuid!: string;
+  @Column({ name: 'user_uuid', type: 'uuid', nullable: true })
+  userUuid!: string | null;
 
   @Column({ type: 'bigint', default: '0' })
   sequence!: string;
 
-  @UpdateDateColumn({ name: 'acknowledged_at', type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
+  @UpdateDateColumn({
+    name: 'acknowledged_at',
+    type: 'timestamptz',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
   acknowledgedAt!: Date;
 }

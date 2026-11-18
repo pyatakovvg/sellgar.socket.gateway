@@ -1,6 +1,8 @@
+import { isUUID } from 'class-validator';
 import { DeliveryChannel, DELIVERY_CHANNELS } from './delivery.constants';
 
 export interface DeliveryMessage {
+  ownerUuid?: string;
   channel: DeliveryChannel;
   deliveryId: string;
   sequence: string;
@@ -17,6 +19,9 @@ export function parseDeliveryMessage(value: unknown): DeliveryMessage {
   }
 
   const message = value as Partial<DeliveryMessage>;
+  if (message.channel === 'carts' ? !isUUID(message.ownerUuid) : message.ownerUuid !== undefined) {
+    throw new Error('Invalid delivery owner');
+  }
   if (
     !DELIVERY_CHANNELS.includes(message.channel as DeliveryChannel) ||
     typeof message.deliveryId !== 'string' ||
