@@ -195,7 +195,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: pyatakovvg/sellgar.infrastructure
-          ref: cbdb3fef6b7b95e74925be1ae8d71536dbeef1ed
+          ref: 0e194f8fb73b133d9882b2979840b6dc0b989ea1
           path: delivery
           sparse-checkout: |
             .github/actions/publish-helm
