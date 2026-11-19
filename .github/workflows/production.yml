@@ -22,6 +22,10 @@ jobs:
   promote:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      packages: write
     env:
       RELEASE_RUN_ID: ${{ inputs.release_run_id }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -84,6 +88,26 @@ jobs:
           if-no-files-found: error
           overwrite: true
           retention-days: 90
+
+      - name: Checkout pinned delivery tooling
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: pyatakovvg/sellgar.infrastructure
+          ref: cbdb3fef6b7b95e74925be1ae8d71536dbeef1ed
+          path: delivery
+          sparse-checkout: |
+            .github/actions/publish-helm
+            charts/application
+          persist-credentials: false
+
+      - name: Publish approved production release
+        uses: ./delivery/.github/actions/publish-helm
+        with:
+          environment: prod
+          source-commit: ${{ steps.promote.outputs.source_commit }}
+          image-digest: ${{ steps.promote.outputs.image_digest }}
+          release-name: socket-gateway
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
   back-merge:
     needs: promote
