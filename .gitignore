@@ -14,3 +14,9 @@ node_modules/
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+code/.yarn/*
+!code/.yarn/releases/
+!code/.yarn/patches/
+code/coverage/
+code/.pnp.*

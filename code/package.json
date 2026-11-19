@@ -19,7 +19,8 @@
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:watch": "node --experimental-vm-modules node_modules/jest/bin/jest.js --watch",
     "test:cov": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
-    "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config test/jest-integration.json --runInBand"
+    "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --config test/jest-integration.json --runInBand",
+    "build:deployment": "nest build && tsc-alias -p tsconfig.build.json"
   },
   "dependencies": {
     "@nestjs/common": "12.2.0",
@@ -53,6 +54,7 @@
     "ts-jest": "29.4.15",
     "ts-loader": "9.6.2",
     "ts-node": "10.9.2",
+    "tsc-alias": "1.9.10",
     "tsconfig-paths": "4.2.0",
     "typescript": "6.0.3",
     "webpack": "5.112.0"

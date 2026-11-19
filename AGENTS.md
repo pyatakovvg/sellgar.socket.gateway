@@ -6,12 +6,12 @@ instances and routes them through authenticated physical Socket.IO connections.
 
 ## Structure
 
-- Feature code belongs in `src/api/v1/<feature>`.
+- Feature code belongs in `code/src/api/v1/<feature>`.
 - A feature is split into `controller`, `gateway`, `repository` and `service`
   folders, following the surrounding Sellgar backend repositories.
 - Keep DTOs under the layer that owns the contract.
 - Keep TypeORM models and the Nest module at the feature root.
-- Keep schema changes in `src/migrations`; never enable `synchronize`.
+- Keep schema changes in `code/src/migrations`; never enable `synchronize`.
 
 ## Boundaries and guarantees
 

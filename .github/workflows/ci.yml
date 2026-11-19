@@ -1,0 +1,183 @@
+name: Socket gateway image
+
+on:
+  pull_request:
+    branches:
+      - development
+      - 'release/**'
+      - master
+  push:
+    branches:
+      - development
+      - 'release/**'
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_NAME: ghcr.io/${{ github.repository }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      image_ref: ${{ steps.build.outputs.image_ref }}
+      image_id: ${{ steps.build.outputs.image_id }}
+      source_tree: ${{ steps.build.outputs.source_tree }}
+      image_artifact: ${{ steps.build.outputs.image_artifact }}
+    steps:
+      - name: Validate release pull request
+        if: github.event_name == 'pull_request' && github.base_ref == 'master'
+        shell: bash
+        env:
+          SOURCE_BRANCH: ${{ github.head_ref }}
+          SOURCE_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+        run: |
+          if [[ "$SOURCE_REPOSITORY" != "$GITHUB_REPOSITORY" || "$SOURCE_BRANCH" != release/* ]]; then
+            printf 'Pull requests into master must come from release/* in the same repository.\n' >&2
+            exit 1
+          fi
+
+      - name: Checkout gateway
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          submodules: recursive
+          token: ${{ secrets.SUBMODULES_READ_TOKEN || github.token }}
+          persist-credentials: false
+
+      - name: Check release safeguards
+        run: python3 -B -m unittest discover -s .github/scripts -p 'test_*.py'
+
+      - name: Build and export image
+        id: build
+        shell: bash
+        run: |
+          image_ref="${IMAGE_NAME,,}:sha-${GITHUB_SHA}"
+          docker build \
+            --platform linux/amd64 \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --tag "$image_ref" .
+          image_id=$(docker image inspect --format '{{.Id}}' "$image_ref")
+          docker save --output "$RUNNER_TEMP/image.tar" "$image_ref"
+          printf 'image_ref=%s\nimage_id=%s\n' "$image_ref" "$image_id" >> "$GITHUB_OUTPUT"
+          printf 'source_tree=%s\n' "$(git rev-parse 'HEAD^{tree}')" >> "$GITHUB_OUTPUT"
+          printf 'image_artifact=socket-gateway-image-%s\n' "$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+
+      - name: Upload image
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ steps.build.outputs.image_artifact }}
+          path: ${{ runner.temp }}/image.tar
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 3
+
+  smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      IMAGE_REF: ${{ needs.build.outputs.image_ref }}
+      EXPECTED_IMAGE_ID: ${{ needs.build.outputs.image_id }}
+    steps:
+      - name: Checkout smoke script
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download image
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ needs.build.outputs.image_artifact }}
+          path: ${{ runner.temp }}
+
+      - name: Load and verify image
+        shell: bash
+        run: |
+          docker load --input "$RUNNER_TEMP/image.tar"
+          test "$(docker image inspect --format '{{.Id}}' "$IMAGE_REF")" = "$EXPECTED_IMAGE_ID"
+
+      - name: Run gateway smoke with mounted .env
+        run: python3 .github/scripts/smoke-image.py "$IMAGE_REF"
+
+  publish:
+    needs: [build, smoke]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE_REF: ${{ needs.build.outputs.image_ref }}
+      EXPECTED_IMAGE_ID: ${{ needs.build.outputs.image_id }}
+      SOURCE_TREE: ${{ needs.build.outputs.source_tree }}
+    outputs:
+      digest: ${{ steps.publish.outputs.digest }}
+      image: ${{ steps.publish.outputs.image }}
+      target_environment: ${{ steps.target.outputs.environment }}
+    steps:
+      - name: Select target environment
+        id: target
+        shell: bash
+        run: |
+          case "$GITHUB_REF" in
+            refs/heads/development) environment=dev ;;
+            refs/heads/release/*) environment=stage ;;
+            *) printf 'Unsupported publication ref: %s\n' "$GITHUB_REF" >&2; exit 1 ;;
+          esac
+          printf 'environment=%s\n' "$environment" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout release scripts
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download verified image
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ needs.build.outputs.image_artifact }}
+          path: ${{ runner.temp }}
+
+      - name: Load and verify image
+        shell: bash
+        run: |
+          docker load --input "$RUNNER_TEMP/image.tar"
+          test "$(docker image inspect --format '{{.Id}}' "$IMAGE_REF")" = "$EXPECTED_IMAGE_ID"
+
+      - name: Login to GHCR
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish verified image
+        id: publish
+        shell: bash
+        env:
+          TARGET_ENVIRONMENT: ${{ steps.target.outputs.environment }}
+        run: |
+          docker push "$IMAGE_REF"
+          image=$(docker image inspect --format '{{index .RepoDigests 0}}' "$IMAGE_REF")
+          digest="${image##*@}"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          printf 'digest=%s\nimage=%s\n' "$digest" "$image" >> "$GITHUB_OUTPUT"
+          printf '### Published image\n\n- Target: `%s`\n- Tag: `%s`\n- Image: `%s`\n' \
+            "$TARGET_ENVIRONMENT" "$IMAGE_REF" "$image" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Record published build
+        env:
+          IMAGE_DIGEST: ${{ steps.publish.outputs.digest }}
+        run: python3 -B .github/scripts/release.py record "$RUNNER_TEMP/release"
+
+      - name: Upload release manifest
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-manifest
+          path: ${{ runner.temp }}/release/
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 90

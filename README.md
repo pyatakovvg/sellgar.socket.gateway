@@ -232,3 +232,14 @@ Cart ticket не открывает административные поток�
 Миграция: `yarn migration:run`. Проверки: `yarn build`, `yarn test --runInBand`,
 `yarn test:integration`. Последняя команда использует случайную схему PostgreSQL.
 Полная цепочка из workspace: `node agent/scripts/smoke-client-cart-socket.cjs`.
+
+## Kubernetes deployment
+
+Sources and local `.env` are under `code/`. Run Yarn commands from `code/`.
+`Dockerfile` builds Node.js 24 production output; aliases are resolved during build.
+The image contains no environment credentials. Kubernetes mounts the environment's
+ConfigMap as `/app/.env`; Secrets are injected with `secretKeyRef` and take precedence.
+`helm/values.app.yaml` uses the shared infrastructure chart; `helm/dev/values.yaml`
+owns public dev configuration. PostgreSQL migrations run once as an Argo Sync Job
+before Socket deployment, after its ConfigMap exists. Other gateways have no DB.
+Only Traefik exposes the gateway; service and broker addresses stay inside Kubernetes.

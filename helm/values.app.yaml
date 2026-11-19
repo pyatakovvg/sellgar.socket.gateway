@@ -1,0 +1,83 @@
+image:
+  repository: ghcr.io/pyatakovvg/sellgar.socket.gateway
+applicationPort: 4040
+env:
+  AMQP_USERNAME:
+    valueFrom:
+      secretKeyRef:
+        name: rabbitmq-default-user
+        key: username
+  AMQP_PASSWORD:
+    valueFrom:
+      secretKeyRef:
+        name: rabbitmq-default-user
+        key: password
+  SOCKET_TICKET_SECRET:
+    valueFrom:
+      secretKeyRef:
+        name: socket-auth
+        key: ticket-secret
+  DATABASE_USERNAME:
+    valueFrom:
+      secretKeyRef:
+        name: socket-database
+        key: username
+  DATABASE_PASSWORD:
+    valueFrom:
+      secretKeyRef:
+        name: socket-database
+        key: password
+podSecurityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+volumeMounts:
+- name: environment
+  mountPath: /app/.env
+  subPath: .env
+  readOnly: true
+- name: temporary-files
+  mountPath: /tmp
+volumes:
+- name: environment
+  configMap:
+    name: socket-gateway-env
+- name: temporary-files
+  emptyDir:
+    sizeLimit: 32Mi
+probes:
+  startup:
+    httpGet:
+      path: /health
+      port: http
+    periodSeconds: 2
+    failureThreshold: 90
+  readiness:
+    httpGet:
+      path: /health
+      port: http
+    periodSeconds: 5
+  liveness:
+    tcpSocket:
+      port: http
+    periodSeconds: 10
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 512Mi
+ingress:
+  enabled: true
+  path: /socket.io
+  stripPrefix: false
+migration:
+  enabled: true
+  command:
+  - node
+  args:
+  - --env-file=.env
+  - node_modules/typeorm/cli.js
+  - -d
+  - dist/data-source.js
+  - migration:run
