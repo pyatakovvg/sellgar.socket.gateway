@@ -6,7 +6,7 @@ configmaps:
   enabled: true
   filename: .env
   data: |
-    PORT=4040
+    PORT=8080
     BASE_URL=http://dev.sellgar.io
     ORIGINS=http://dev.sellgar.io
     DATABASE_HOST=postgresql-rw

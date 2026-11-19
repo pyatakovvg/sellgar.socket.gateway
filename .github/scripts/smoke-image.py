@@ -11,7 +11,7 @@ import uuid
 
 image = sys.argv[1]
 kind = 'socket'
-port = 4040
+port = 8080
 network = 'gateway-smoke-' + uuid.uuid4().hex[:10]
 containers = []
 
@@ -40,7 +40,7 @@ try:
         if '=' in line and not line.lstrip().startswith('#'):
             key, value = line.split('=', 1)
             values[key] = value.strip().strip('"')
-    values.update(AMQP_HOSTNAME='broker', AMQP_USERNAME='smoke', AMQP_PASSWORD='smoke', ORIGINS='http://localhost',
+    values.update(PORT=str(port), AMQP_HOSTNAME='broker', AMQP_USERNAME='smoke', AMQP_PASSWORD='smoke', ORIGINS='http://localhost',
                   SOCKET_TICKET_SECRET='isolated-smoke-secret-not-used-in-any-environment',
                   STOREFRONT_SHOP_UUID='a7bded5f-24ee-4d2a-b13f-2436f4f5337f')
     if kind == 'socket':

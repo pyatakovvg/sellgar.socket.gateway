@@ -243,3 +243,6 @@ ConfigMap as `/app/.env`; Secrets are injected with `secretKeyRef` and take prec
 owns public dev configuration. PostgreSQL migrations run once as an Argo Sync Job
 before Socket deployment, after its ConfigMap exists. Other gateways have no DB.
 Only Traefik exposes the gateway; service and broker addresses stay inside Kubernetes.
+
+Kubernetes HTTP listener and Service use `8080`; the mounted `.env` sets
+`PORT=8080`. Local host development ports in `code/.env.example` remain separate.

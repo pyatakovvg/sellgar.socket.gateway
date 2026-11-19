@@ -2,7 +2,7 @@ image:
   repository: ghcr.io/pyatakovvg/sellgar.socket.gateway
 imagePullSecrets:
 - name: ghcr-pull
-applicationPort: 4040
+applicationPort: 8080
 env:
   AMQP_USERNAME:
     valueFrom:
