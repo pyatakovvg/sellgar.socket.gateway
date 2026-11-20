@@ -1,14 +1,15 @@
 replicas: 1
 ingress:
-  host: dev.sellgar.io
+  host: dev.sellgar.ru
+  tlsSecretName: sellgar-dev-tls
 configmaps:
 - nameOverride: socket-gateway-env
   enabled: true
   filename: .env
   data: |
     PORT=8080
-    BASE_URL=http://dev.sellgar.io
-    ORIGINS=http://dev.sellgar.io
+    BASE_URL=https://dev.sellgar.ru
+    ORIGINS=https://dev.sellgar.ru;https://admin.dev.sellgar.ru
     DATABASE_HOST=postgresql-rw
     DATABASE_PORT=5432
     DATABASE_DATABASE_NAME=socket_srv
