@@ -21,16 +21,14 @@ concurrency:
 jobs:
   validate:
     if: github.ref == 'refs/heads/master'
-    uses: sellgar/sellgar.infrastructure/.github/workflows/validate-release.yml@delivery-v0.6.0
+    uses: sellgar/sellgar.infrastructure/.github/workflows/validate-release.yml@delivery-v0.7.0
     with:
       release_tag: ${{ inputs.release_tag }}
       migrations: true
 
   delivery:
     needs: validate
-    uses: sellgar/sellgar.infrastructure/.github/workflows/deliver-service.yml@delivery-v0.6.0
-    secrets:
-      SUBMODULES_READ_TOKEN: ${{ secrets.SUBMODULES_READ_TOKEN }}
+    uses: sellgar/sellgar.infrastructure/.github/workflows/deliver-service.yml@delivery-v0.7.0
     with:
       environment: prod
       namespace: sellgar-prod
@@ -42,7 +40,7 @@ jobs:
 
   back-merge:
     needs: delivery
-    uses: sellgar/sellgar.infrastructure/.github/workflows/back-merge.yml@delivery-v0.6.0
+    uses: sellgar/sellgar.infrastructure/.github/workflows/back-merge.yml@delivery-v0.7.0
     permissions:
       contents: read
       pull-requests: write

@@ -12,8 +12,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  unit:
+    uses: sellgar/sellgar.infrastructure/.github/workflows/test-application.yml@delivery-v0.7.0
+    secrets:
+      SUBMODULES_READ_TOKEN: ${{ secrets.SUBMODULES_READ_TOKEN }}
+    with:
+      source-revision: ${{ github.sha }}
+
   images:
-    uses: sellgar/sellgar.infrastructure/.github/workflows/build-service.yml@delivery-v0.6.0
+    needs: unit
+    uses: sellgar/sellgar.infrastructure/.github/workflows/build-service.yml@delivery-v0.7.0
     permissions:
       contents: write
       packages: write
@@ -26,9 +34,7 @@ jobs:
 
   delivery:
     needs: images
-    uses: sellgar/sellgar.infrastructure/.github/workflows/deliver-service.yml@delivery-v0.6.0
-    secrets:
-      SUBMODULES_READ_TOKEN: ${{ secrets.SUBMODULES_READ_TOKEN }}
+    uses: sellgar/sellgar.infrastructure/.github/workflows/deliver-service.yml@delivery-v0.7.0
     with:
       environment: dev
       namespace: sellgar-dev

@@ -60,6 +60,6 @@ Guest ticket без sub допускается только для owner-bound C
 
 ## Контракт CI/CD
 
-- Отдельный Docker target `tests` и job `test` обязательны; деплой зависит от успешных тестов.
-- Есть отдельный `migration` image и job `migrate`; test и migrate идут параллельно до deploy.
+- Отдельный Docker target `tests` и job `unit` обязательны; сборка и деплой зависят от успешных юнит-тестов.
+- Есть отдельный `migration` image и job `migrate`; unit запускается до build, migrate — после publish.
 - CI/CD и конфигурация описаны в разделе «CI и доставка» README. Python/smoke wrappers удалены; команды Helm/kubectl видны в общих workflows.

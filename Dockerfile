@@ -1,11 +1,13 @@
-FROM node:24-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54 AS builder
+FROM node:24-bookworm-slim@sha256:dc26ae92c9fb15cf6b1d63e20f0944b2efe0f115b20e00be48fb23fceb061c54 AS dependencies
 WORKDIR /app
 COPY code/ ./
-RUN node .yarn/releases/yarn-4.18.0.cjs install --immutable \
-    && node .yarn/releases/yarn-4.18.0.cjs build:deployment
+RUN node .yarn/releases/yarn-4.18.0.cjs install --immutable
 
-FROM builder AS tests
-RUN node .yarn/releases/yarn-4.18.0.cjs test --runInBand
+FROM dependencies AS tests
+RUN node .yarn/releases/yarn-4.18.0.cjs test --runInBand --testPathIgnorePatterns='\.integration[.-]spec\.ts$'
+
+FROM dependencies AS builder
+RUN node .yarn/releases/yarn-4.18.0.cjs build:deployment
 
 FROM builder AS production-dependencies
 RUN node .yarn/releases/yarn-4.18.0.cjs workspaces focus --production
