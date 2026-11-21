@@ -57,3 +57,9 @@ Guest ticket без sub допускается только для owner-bound C
 Применить также GuestSessionCursors1794870001000. Пассивные проверки не продлевают гостевой срок.
 Применить PrivateCartDelivery1794850000000. Tests: yarn test:integration создает
 только случайные socket_cart_test_* schemas.
+
+## Контракт CI/CD
+
+- Отдельный Docker target `tests` и job `test` обязательны; деплой зависит от успешных тестов.
+- Есть отдельный `migration` image и job `migrate`; test и migrate идут параллельно до deploy.
+- CI/CD и конфигурация описаны в разделе «CI и доставка» README. Python/smoke wrappers удалены; команды Helm/kubectl видны в общих workflows.

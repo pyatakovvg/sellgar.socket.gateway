@@ -1,5 +1,5 @@
 image:
-  repository: ghcr.io/pyatakovvg/sellgar.socket.gateway
+  repository: ghcr.io/sellgar/sellgar.socket.gateway
 imagePullSecrets:
 - name: ghcr-pull
 applicationPort: 8080
@@ -34,16 +34,9 @@ podSecurityContext:
   runAsGroup: 1000
   fsGroup: 1000
 volumeMounts:
-- name: environment
-  mountPath: /app/.env
-  subPath: .env
-  readOnly: true
 - name: temporary-files
   mountPath: /tmp
 volumes:
-- name: environment
-  configMap:
-    name: socket-gateway-env
 - name: temporary-files
   emptyDir:
     sizeLimit: 32Mi
@@ -74,12 +67,24 @@ ingress:
   path: /socket.io
   stripPrefix: false
 migration:
+  enabled: false
+  image:
+    repository: ghcr.io/sellgar/sellgar.socket.gateway
+  env:
+    DATABASE_USERNAME:
+      valueFrom:
+        secretKeyRef:
+          name: socket-database
+          key: username
+    DATABASE_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: socket-database
+          key: password
+  backoffLimit: 0
+  activeDeadlineSeconds: 600
+  ttlSecondsAfterFinished: 86400
+environmentFile:
   enabled: true
-  command:
-  - node
-  args:
-  - --env-file=.env
-  - node_modules/typeorm/cli.js
-  - -d
-  - dist/data-source.js
-  - migration:run
+  filename: .env
+  mountPath: /app/.env

@@ -2,10 +2,7 @@ replicas: 1
 ingress:
   host: dev.sellgar.ru
   tlsSecretName: sellgar-dev-tls
-configmaps:
-- nameOverride: socket-gateway-env
-  enabled: true
-  filename: .env
+environmentFile:
   data: |
     PORT=8080
     BASE_URL=https://dev.sellgar.ru

@@ -1,0 +1,35 @@
+name: socket-gateway checks and release candidate
+
+on:
+  pull_request:
+    branches: [development, 'release/**', master]
+  push:
+    branches: ['release/**']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: socket-gateway-checks-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  images:
+    uses: sellgar/sellgar.infrastructure/.github/workflows/build-service.yml@delivery-v0.6.0
+    permissions:
+      contents: write
+      packages: write
+    secrets:
+      SUBMODULES_READ_TOKEN: ${{ secrets.SUBMODULES_READ_TOKEN }}
+    with:
+      release-name: socket-gateway
+      migrations: true
+      publish: ${{ github.event_name == 'push' }}
+
+  test:
+    needs: images
+    uses: sellgar/sellgar.infrastructure/.github/workflows/test-application.yml@delivery-v0.6.0
+    secrets:
+      SUBMODULES_READ_TOKEN: ${{ secrets.SUBMODULES_READ_TOKEN }}
+    with:
+      source-revision: ${{ github.sha }}
